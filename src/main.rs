@@ -16,7 +16,12 @@ pub extern "C" fn _start() ->! {
     //initalize the idt 
     bitos::init();
     //temporaily pause a prgram when the breakpoint instruction int3 is executed.
-    x86_64::instructions::interrupts::int3();
+    //x86_64::instructions::interrupts::int3();
+
+    //trigger a page fault to see what happened in qemu
+    unsafe{
+        *(0xdeadbeef as *mut u64) = 42;
+    };
 
     //cfg is a special conditional compilation, compile code based on flag
     #[cfg(test)]
