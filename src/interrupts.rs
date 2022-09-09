@@ -1,8 +1,13 @@
 
+use core::f32::consts::PI;
+
 use crate::println;
 use lazy_static::lazy_static;
 use x86_64::structures::idt::{InterruptDescriptorTable,InterruptStackFrame};
-
+use crate::gdt;
+//ChainedPics:Primary and Secondary Interrupt Controller
+use pic8259::ChainedPics;
+use spin;
 
 lazy_static!{
     static ref IDT: InterruptDescriptorTable = {
@@ -11,7 +16,10 @@ lazy_static!{
         let mut idt = InterruptDescriptorTable::new();
         //add the interrupt handler for interrupt to idt
         idt.breakpoint.set_handler_fn(breakpoint_handler);
-        idt.double_fault.set_handler_fn(double_fault_handler);
+        //tell CPU to use double fault stack when double fault occur
+        unsafe{
+            idt.double_fault.set_handler_fn(double_fault_handler).set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
+        } 
         idt
     };
 }
@@ -34,6 +42,17 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame:InterruptStackFrame, 
     panic!("Exception:Double fault\n{:#?}",stack_frame);
 
 }
+
+
+pub const PIC_1_OFFSET : u8 = 32;
+pub const PIC_2_OFFSET : u8 = PIC_1_OFFSET + 8;
+pub static PICS:spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe{ChainedPics::new(PIC_1_OFFSET,PIC_2_OFFSET)});
+
+
+
+
+
+
 
 //test for breakpoint interrupt
 #[test_case]
