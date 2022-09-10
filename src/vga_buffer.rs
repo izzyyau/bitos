@@ -146,7 +146,11 @@ impl fmt::Write for Writer{
     #[doc(hidden)]
     pub fn _print(args: fmt::Arguments){
         use core::fmt::Write;
-        WRITER.lock().write_fmt(args).unwrap();
+        use x86_64::instructions::interrupts;
+        //implement closure to disable interrupt when Writer is locked,
+        //so there is no deadlock occurs.
+        interrupts::without_interrupts(||{WRITER.lock().write_fmt(args).unwrap();
+        });
     }
 
 
