@@ -1,5 +1,4 @@
 
-use core::f32::consts::PI;
 
 use crate::println;
 use lazy_static::lazy_static;
@@ -48,6 +47,22 @@ pub const PIC_1_OFFSET : u8 = 32;
 pub const PIC_2_OFFSET : u8 = PIC_1_OFFSET + 8;
 pub static PICS:spin::Mutex<ChainedPics> = spin::Mutex::new(unsafe{ChainedPics::new(PIC_1_OFFSET,PIC_2_OFFSET)});
 
+#[derive(Debug,Clone,Copy)]
+#[repr(u8)]
+pub enum InterruptIndex {
+    Timer  = PIC_1_OFFSET,
+}
+
+impl InterruptIndex{
+    fn as_u8(self) -> u8{
+        self as u8
+    }
+
+    fn as_usize(self) -> usize{
+        usize::from(self.as_u8())
+    }
+
+}
 
 
 
