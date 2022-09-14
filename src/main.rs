@@ -18,13 +18,21 @@ pub extern "C" fn _start() ->! {
     //temporaily pause a prgram when the breakpoint instruction int3 is executed.
     //x86_64::instructions::interrupts::int3();
 
+    let ptr = 0x2031b2 as *mut u32;
+    //read 
+    unsafe{let x = *ptr;}
+    println!("read worker");
+
+    //write
+    unsafe{*ptr = 42;}
+    println!("write worked");
+
 
     //cfg is a special conditional compilation, compile code based on flag
     #[cfg(test)]
     test_main();
-
-
-    loop{}
+    println!("It did not crash!");
+    bitos::hlt_loop();
 
 }
 
@@ -33,7 +41,7 @@ pub extern "C" fn _start() ->! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    loop {}
+    bitos::hlt_loop();
 }
 
 #[cfg(test)]
