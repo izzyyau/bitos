@@ -2,11 +2,13 @@
 
 use crate::println;
 use lazy_static::lazy_static;
-use x86_64::structures::idt::{InterruptDescriptorTable,InterruptStackFrame};
+use x86_64::structures::{idt::{InterruptDescriptorTable,InterruptStackFrame}, paging::page};
 use crate::gdt;
 //ChainedPics:Primary and Secondary Interrupt Controller
 use pic8259::ChainedPics;
 use spin;
+use pc_keyboard::{layouts, DecodedKey, HandleControl, Keyboard, ScancodeSet1};
+use spin::Mutex;
 
 #[derive(Debug,Clone,Copy)]
 #[repr(u8)]
@@ -46,6 +48,7 @@ lazy_static!{
         } 
         idt[InterruptIndex::Timer.as_usize()].set_handler_fn(timer_interrupt_handler);
         idt[InterruptIndex::Keyboard.as_usize()].set_handler_fn(keyboard_interrupt_handler);
+        idt.page_fault.set_handler_fn(page_fault_handler);
         idt
     };
 }
@@ -101,11 +104,48 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame:InterruptStack
     if let Some(key) = key{
         println!("{}", key);
     }
+
+    lazy_static! {
+        static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
+            Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1,
+                HandleControl::Ignore)
+            );
+    }
+    let mut keyboard = KEYBOARD.lock();
+    let mut port = Port::new(0x60);
+
+    let scancode: u8 = unsafe { port.read() };
+    //keyevent : keyboard.add_byte(scancode)
+    //keyboard.process_keyevent(key_event)
+    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+        if let Some(key) = keyboard.process_keyevent(key_event) {
+            match key {
+                DecodedKey::Unicode(character) => println!("{}", character),
+                DecodedKey::RawKey(key) => println!("{:?}", key),
+            }
+        }
+    }
+
     //notify PIC the interrupt handler for current interrupt has done its job
     unsafe{
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
     }
 
+}
+
+//page fault handler function 
+use x86_64::structures::idt::PageFaultErrorCode;
+use crate::hlt_loop;
+
+extern "x86-interrupt" fn page_fault_handler(stack_frame:InterruptStackFrame,
+error_code: PageFaultErrorCode,){
+    use x86_64::registers::control::Cr2;
+    println!("Exception:Page Fault");
+    //use Cr2::read() to get which virtual address cause page fault 
+    println!("Accessed Address:{:?}",Cr2::read());
+    println!("Error Code: {:?}",error_code);
+    println!("{:#?}",stack_frame);
+    hlt_loop();
 }
 
 
