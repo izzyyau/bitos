@@ -8,7 +8,7 @@ use crate::println;
 //2. translate the virtual address to physical address 
 //3. modify the page table in order to create a new mapping
 
-pub unsafe fn active_level_4_table(physical_memory_offset:VirtAddr)
+ unsafe fn active_level_4_table(physical_memory_offset:VirtAddr)
 -> &'static mut PageTable{
     use x86_64::registers::control::Cr3;
 
@@ -71,3 +71,13 @@ fn translate_addr_inner(addr:VirtAddr,physical_memory_offset:VirtAddr)->Option<P
 
     }
 
+    use x86_64::structures::paging::OffsetPageTable;
+    //OffsetPageTable
+    pub unsafe fn init(physical_memory_offset: VirtAddr) -> OffsetPageTable<'static> {
+        //get the mutable reference of level 4 table
+        let level_4_table = active_level_4_table(physical_memory_offset);
+        //physical_memory_offset: this is where virtual address stared to map physical address
+        OffsetPageTable::new(level_4_table, physical_memory_offset)
+        
+    }
+    
