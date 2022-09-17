@@ -1,6 +1,8 @@
 use x86_64::{
-    structures::paging::{PageTable, Page},
+    structures::paging::{PageTable, Page,PhysFrame,Mapper,Size4KiB,FrameAllocator},
     VirtAddr,
+    PhysAddr,
+
 };
 use crate::println;
 //Three things we need to do 
@@ -23,7 +25,6 @@ use crate::println;
     &mut *page_table_ptr
 }
 
-use x86_64::PhysAddr;
 pub unsafe fn translate_addr(addr:VirtAddr, physical_memory_offset:VirtAddr) 
 -> Option<PhysAddr>{
     translate_addr_inner(addr,physical_memory_offset)
@@ -78,6 +79,78 @@ fn translate_addr_inner(addr:VirtAddr,physical_memory_offset:VirtAddr)->Option<P
         let level_4_table = active_level_4_table(physical_memory_offset);
         //physical_memory_offset: this is where virtual address stared to map physical address
         OffsetPageTable::new(level_4_table, physical_memory_offset)
-        
+
     }
     
+    /// Creates an example mapping for the given page to frame `0xb8000`.
+pub fn create_example_mapping(
+    page: Page,
+    mapper: &mut OffsetPageTable,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+) {
+    use x86_64::structures::paging::PageTableFlags as Flags;
+
+    let frame = PhysFrame::containing_address(PhysAddr::new(0xb8000));
+    let flags = Flags::PRESENT | Flags::WRITABLE;
+
+    let map_to_result = unsafe {
+        mapper.map_to(page, frame, flags, frame_allocator)
+    };
+    map_to_result.expect("map_to failed").flush();
+}
+
+use bootloader::bootinfo::MemoryMap;
+
+/// A FrameAllocator that returns usable frames from the bootloader's memory map.
+pub struct BootInfoFrameAllocator {
+    //memory_map consists a list of MemoryRegion structs, which contain the start
+    //address,the length, ant the type of each memory region or memory frame
+    memory_map: &'static MemoryMap,
+    next: usize,
+}
+
+impl BootInfoFrameAllocator {
+    /// Create a FrameAllocator from the passed memory map.
+
+    pub unsafe fn init(memory_map: &'static MemoryMap) -> Self {
+        BootInfoFrameAllocator {
+            memory_map,
+            //increased by every time allocating frame
+            next: 0,
+        }
+    }
+}
+
+
+use bootloader::bootinfo::MemoryRegionType;
+
+impl BootInfoFrameAllocator {
+    /// Converts the memory map into an iterator of usable physical memory frame.
+    /// Returns an iterator over the usable frames specified in the memory map.
+    fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
+        // First,call the iter method to convert the memory map to an iterator of MemoryReigons
+        let regions = self.memory_map.iter();
+        // Second, use filter method to skip any reserved or unavailable regions.
+        let usable_regions = regions
+            .filter(|r| r.region_type == MemoryRegionType::Usable);
+        // Afterwards, we use the map combinator and Rust’s range syntax to transform our iterator of memory regions to an iterator of address ranges.
+        let addr_ranges = usable_regions
+            .map(|r| r.range.start_addr()..r.range.end_addr());
+        println!("The addr_ranges is {:?}", addr_ranges);
+        // Then, transform to an iterator of frame start addresses,choose every 4096th address.
+        // because 4096 bytes is the page size.
+        let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
+        println!("The usable frame start addresses are : {:?}" , frame_addresses);
+        // Finally, convert the start addresses to PhysFrame types to construct an Iterator<Item = PhysFrame>
+        frame_addresses
+            .map(|addr|PhysFrame::containing_address(PhysAddr::new(addr)))
+    }
+}
+
+unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
+    fn allocate_frame(&mut self) -> Option<PhysFrame> {
+        let frame = self.usable_frames().nth(self.next);
+        self.next += 1;
+        frame
+    }
+}
