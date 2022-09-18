@@ -2,18 +2,35 @@
 #![no_std]
 #![cfg_attr(test, no_main)]
 #![feature(custom_test_frameworks)]
+#![feature(alloc_error_handler)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 #![feature(abi_x86_interrupt)]
+
+extern crate alloc;
 
 use core::panic::PanicInfo;
 
 pub mod serial;
 pub mod vga_buffer;
 pub mod interrupts;
+pub mod gdt;
+pub mod memory;
+pub mod allocator;
+
+#[global_allocator]
+//tell compiler which allocator it should use
+static ALLOCATOR:allocator::Dummy = allocator::Dummy;
+
 
 pub fn init(){
+    gdt::init();
     interrupts::init_idt();
+    unsafe{interrupts::PICS.lock().initialize()};
+    //enable external interrupts, then CPU can listen to the interrupt controller
+    x86_64::instructions::interrupts::enable();
+
+
 }
 pub trait Testable{
     fn run(&self) ->();
@@ -43,7 +60,7 @@ pub fn test_panic_handler(info:&PanicInfo) -> !{
     serial_println!("[failed]\n");
     serial_println!("Error: {}\n", info);
     exit_qemu(QemuExitCode::Failed);
-    loop {}
+    hlt_loop();
 }
 
 
@@ -64,20 +81,39 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
 }
 
 #[cfg(test)]
-#[no_mangle]
+use bootloader::{entry_point,BootInfo};
+
+#[cfg(test)]
+entry_point!(test_kernel_main);
+/// Entry point for `cargo test`
+#[cfg(test)]
+fn test_kernel_main(_boot_info: &'static BootInfo) -> ! {
+    // like before
+    init();
+    test_main();
+    hlt_loop();
+}
+
+
 //lib.rs is a seperate crate, it is tested independently of main.rs
 //so we need to add a _start entry point and a panic handler when the library is compiled 
 //in test mode
 //This _start function is used when running cargo test  --lib
-pub extern "C" fn _start() -> ! {
-    //For testing breakpoint interrupt work or not?
-    init();
-    test_main();
-    loop {}
-}
+
 
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     test_panic_handler(info)
+}
+
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
+}
+
+#[alloc_error_handler]
+fn alloc_error_handler(layout: alloc::alloc::Layout) -> ! {
+    panic!("allocation error: {:?}", layout)
 }
