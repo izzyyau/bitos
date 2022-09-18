@@ -6,14 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bootloader = "0.9.8"
+bootloader = { version = "0.9.8", features = ["map_physical_memory"]}
 volatile = "0.2.6"
 spin = "0.5.2"
 uart_16550 = "0.2.0"
 x86_64 = "0.14.2"
 pic8259 = "0.10.0"
 pc-keyboard = "0.5.0"
-bootloader = {version = "0.9.8", features = ["map_physical_memory"]}
+linked_list_allocator = "0.9.0"
 
 [dependencies.lazy_static]
 version = "1.0"
@@ -37,3 +37,5 @@ name = "should_panic"
 harness = false
 
 
+[unstable]
+build-std = ["core", "compiler_builtins", "alloc"]

@@ -6,9 +6,10 @@ use x86_64::{
     },
     VirtAddr,
 };
+use linked_list_allocator::LockedHeap;
 
-
-
+#[global_allocator]
+static ALLOCATOR: LockedHeap = LockedHeap::empty();
 
 //create a kernel heap, first we define a virtual memory region for heap.
 pub const HEAP_START: usize = 0x_4444_4444_0000;
@@ -56,6 +57,10 @@ pub fn init_heap(
         unsafe{
             mapper.map_to(page, frame, flags, frame_allocator)?.flush()
         };
+    }
+    //initalize linked_list_allocator
+    unsafe {
+        ALLOCATOR.lock().init(HEAP_START, HEAP_SIZE);
     }
 
     Ok(())
