@@ -6,6 +6,7 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 #![feature(abi_x86_interrupt)]
+#![feature(const_mut_refs)]
 
 extern crate alloc;
 
@@ -17,11 +18,7 @@ pub mod interrupts;
 pub mod gdt;
 pub mod memory;
 pub mod allocator;
-
-#[global_allocator]
-//tell compiler which allocator it should use
-static ALLOCATOR:allocator::Dummy = allocator::Dummy;
-
+pub mod task;
 
 pub fn init(){
     gdt::init();
