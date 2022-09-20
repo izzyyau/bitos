@@ -61,6 +61,7 @@ impl Executor {
             }
         }
     }
+    //with waker in place
     pub fn run(&mut self) -> ! {
         loop {
             self.run_ready_tasks();
@@ -69,8 +70,11 @@ impl Executor {
 }
 
 
+//The job of the waker is to push the ID of the woken task to the task_queue of the executor
 struct TaskWaker {
     task_id: TaskId,
+    //Since the ownership of the task_queue is shared between the executor and wakers, we use the Arc 
+    //wrapper type to implement shared reference-counted ownership.
     task_queue: Arc<ArrayQueue<TaskId>>,
 }
 
@@ -89,7 +93,7 @@ impl Wake for TaskWaker {
         self.wake_task();
     }
 }
-
+//create waker
 impl TaskWaker {
     fn new(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
         Waker::from(Arc::new(TaskWaker {
