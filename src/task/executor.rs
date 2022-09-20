@@ -65,9 +65,23 @@ impl Executor {
     pub fn run(&mut self) -> ! {
         loop {
             self.run_ready_tasks();
+            self.sleep_if_idle();   // new
+        }
+    }
+    fn sleep_if_idle(&self) {
+        use x86_64::instructions::interrupts::{self, enable_and_hlt};
+        //avoid the race condition that interrupts happen right between is_empty check 
+        //and the call to hlt
+        interrupts::disable();
+        if self.task_queue.is_empty() {
+            enable_and_hlt();
+        }
+        else {
+            interrupts::enable();
         }
     }
 }
+
 
 
 //The job of the waker is to push the ID of the woken task to the task_queue of the executor
@@ -82,6 +96,12 @@ impl TaskWaker {
     fn wake_task(&self) {
         self.task_queue.push(self.task_id).expect("task_queue full");
     }
+    fn new(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
+        Waker::from(Arc::new(TaskWaker {
+            task_id,
+            task_queue,
+        }))
+    }
 }
 
 impl Wake for TaskWaker {
@@ -91,14 +111,5 @@ impl Wake for TaskWaker {
 
     fn wake_by_ref(self: &Arc<Self>) {
         self.wake_task();
-    }
-}
-//create waker
-impl TaskWaker {
-    fn new(task_id: TaskId, task_queue: Arc<ArrayQueue<TaskId>>) -> Waker {
-        Waker::from(Arc::new(TaskWaker {
-            task_id,
-            task_queue,
-        }))
     }
 }
