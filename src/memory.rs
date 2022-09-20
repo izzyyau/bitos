@@ -136,11 +136,9 @@ impl BootInfoFrameAllocator {
         // Afterwards, we use the map combinator and Rust’s range syntax to transform our iterator of memory regions to an iterator of address ranges.
         let addr_ranges = usable_regions
             .map(|r| r.range.start_addr()..r.range.end_addr());
-        println!("The addr_ranges is {:?}", addr_ranges);
         // Then, transform to an iterator of frame start addresses,choose every 4096th address.
         // because 4096 bytes is the page size.
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(4096));
-        println!("The usable frame start addresses are : {:?}" , frame_addresses);
         // Finally, convert the start addresses to PhysFrame types to construct an Iterator<Item = PhysFrame>
         frame_addresses
             .map(|addr|PhysFrame::containing_address(PhysAddr::new(addr)))

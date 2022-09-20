@@ -75,7 +75,7 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame:InterruptStackFrame, 
 
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame:InterruptStackFrame){
-   // println!(".");
+    println!(".");
     unsafe{
         PICS.lock().notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
     }
@@ -85,27 +85,33 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame:InterruptStack
     use x86_64::instructions::port::Port;
    
 
-    lazy_static! {
-        static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
-            Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1,
-                HandleControl::Ignore)
-            );
-    }
-    let mut keyboard = KEYBOARD.lock();
-    let mut port = Port::new(0x60);
+    // lazy_static! {
+    //     static ref KEYBOARD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> =
+    //         Mutex::new(Keyboard::new(layouts::Us104Key, ScancodeSet1,
+    //             HandleControl::Ignore)
+    //         );
+    // }
 
+    let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
-    crate::task::keyboard::add_scancode(scancode); // new
-    //keyevent : keyboard.add_byte(scancode)
-    //keyboard.process_keyevent(key_event)
-    if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-        if let Some(key) = keyboard.process_keyevent(key_event) {
-            match key {
-                DecodedKey::Unicode(character) => println!("{}", character),
-                DecodedKey::RawKey(key) => println!("{:?}", key),
-            }
-        }
-    }
+    crate::task::keyboard::add_scancode(scancode);
+
+
+    // let mut keyboard = KEYBOARD.lock();
+    // let mut port = Port::new(0x60);
+
+    // let scancode: u8 = unsafe { port.read() };
+    // crate::task::keyboard::add_scancode(scancode); // new
+    // //keyevent : keyboard.add_byte(scancode)
+    // //keyboard.process_keyevent(key_event)
+    // if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+    //     if let Some(key) = keyboard.process_keyevent(key_event) {
+    //         match key {
+    //             DecodedKey::Unicode(character) => println!("{}", character),
+    //             DecodedKey::RawKey(key) => println!("{:?}", key),
+    //         }
+    //     }
+    // }
 
     //notify PIC the interrupt handler for current interrupt has done its job
     unsafe{
